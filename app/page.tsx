@@ -6,6 +6,7 @@ import { NutritionIntelligence } from "@/components/nutrition-intelligence"
 import { Reviews } from "@/components/reviews"
 import { PlatformFeatures } from "@/components/platform-features"
 import { BusinessDashboard } from "@/components/business-dashboard"
+import { CommentsSection } from "@/components/comments-section"
 import { FinalCTA } from "@/components/final-cta"
 import { Footer } from "@/components/footer"
 
@@ -18,6 +19,7 @@ export default function Home() {
       <LiveTracking />
       <NutritionIntelligence />
       <Reviews />
+      <CommentsSection />
       <PlatformFeatures />
       <BusinessDashboard />
       <FinalCTA />
