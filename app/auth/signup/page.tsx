@@ -69,7 +69,7 @@ export default function SignupPage() {
         <div className="max-w-md mx-auto">
           <Card className="p-8 space-y-6">
             <div className="text-center space-y-2">
-              <h1 className="text-3xl font-bold font-serif text-primary">Join GramoOrja</h1>
+              <h1 className="text-3xl font-bold font-serif text-primary">Join Ghoroa Delights</h1>
               <p className="text-muted-foreground">Create your account to start ordering</p>
             </div>
 

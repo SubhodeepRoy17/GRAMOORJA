@@ -52,7 +52,7 @@ export default function LoginPage() {
           <Card className="p-8 space-y-6">
             <div className="text-center space-y-2">
               <h1 className="text-3xl font-bold font-serif text-primary">Welcome Back</h1>
-              <p className="text-muted-foreground">Sign in to your GramoOrja account</p>
+              <p className="text-muted-foreground">Sign in to your Ghoroa Delights account</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">

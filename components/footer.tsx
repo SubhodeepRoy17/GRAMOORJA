@@ -8,7 +8,7 @@ export function Footer() {
               <div className="w-6 h-6 bg-secondary rounded-lg flex items-center justify-center">
                 <span className="text-foreground font-bold text-xs">GO</span>
               </div>
-              <span className="font-serif font-bold">GramoOrja</span>
+              <span className="font-serif font-bold">Ghoroa Delights</span>
             </div>
             <p className="text-sm text-background/70">Traditional sweets, modern technology.</p>
           </div>
@@ -79,7 +79,7 @@ export function Footer() {
 
         <div className="border-t border-background/20 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-background/70">
-            <p>&copy; 2025 GramoOrja. All rights reserved.</p>
+            <p>&copy; 2025 Ghoroa Delights. All rights reserved.</p>
             <div className="flex gap-4">
               <a href="#" className="hover:text-background transition-colors">
                 Twitter

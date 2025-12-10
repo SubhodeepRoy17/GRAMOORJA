@@ -25,7 +25,7 @@ export function ValueProps() {
     <section id="features" className="w-full py-20 md:py-28 px-4 sm:px-6 lg:px-8 bg-muted/30">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="font-serif text-4xl md:text-5xl font-bold mb-4">Why Choose GramoOrja?</h2>
+          <h2 className="font-serif text-4xl md:text-5xl font-bold mb-4">Why Choose Ghoroa Delights?</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             We blend time-tested traditions with cutting-edge technology for an unmatched experience
           </p>

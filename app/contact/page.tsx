@@ -47,7 +47,7 @@ export default function ContactPage() {
               <Card className="p-6 space-y-3">
                 <Mail className="w-8 h-8 text-primary" />
                 <h3 className="font-bold">Email</h3>
-                <p className="text-muted-foreground">hello@gramoorja.com</p>
+                <p className="text-muted-foreground">hello@Ghoroa Delights.com</p>
               </Card>
               <Card className="p-6 space-y-3">
                 <Phone className="w-8 h-8 text-primary" />

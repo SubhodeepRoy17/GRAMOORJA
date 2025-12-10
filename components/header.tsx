@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X, ShoppingCart, User } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 
 export function Header() {
@@ -29,10 +30,16 @@ export function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">GO</span>
+            <div className="w-15 h-15 relative">
+              <Image
+                src="/logo.png"
+                alt="Ghoroa Delights Logo"
+                fill
+                className="object-contain"
+                sizes="112px"
+              />
             </div>
-            <span className="hidden sm:inline font-serif font-bold text-lg text-primary">GramoOrja</span>
+            <span className="hidden sm:inline font-serif font-bold text-lg text-primary">Ghoroa Delights</span>
           </Link>
 
           {/* Desktop Navigation */}

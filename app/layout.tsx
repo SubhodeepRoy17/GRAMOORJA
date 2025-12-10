@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "GramoOrja - Traditional Sweets, Modern Tech",
+  title: "Ghoroa Delights - Traditional Sweets, Modern Tech",
   description: "Premium Kanakchur Muri Ladoo with smart ordering and tracking",
   generator: "v0.app",
   icons: {
