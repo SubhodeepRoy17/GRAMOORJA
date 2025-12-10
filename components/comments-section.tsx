@@ -2,268 +2,287 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useState, useEffect } from "react"
-import { Heart, MessageCircle, Star } from "lucide-react"
-import { FaThumbsUp, FaThumbsDown } from "react-icons/fa"
+import { useEffect, useMemo, useState } from "react"
+import { Heart, MessageCircle } from "lucide-react"
 
-// ENHANCED SENTIMENT ANALYZER WITH MORE VARIATIONS
-function analyzeSentiment(text: string) {
-  const positiveWords = [
-    // Quality & Excellence
-    "good", "great", "amazing", "excellent", "outstanding", "superb", "fantastic", "wonderful",
-    "awesome", "brilliant", "perfect", "phenomenal", "splendid", "terrific", "remarkable",
-    "exceptional", "magnificent", "fabulous", "marvelous", "stellar", "top-notch", "premium",
-    
-    // Taste & Flavor
-    "tasty", "delicious", "yummy", "scrumptious", "delectable", "flavorful", "savory", "mouthwatering",
-    "appetizing", "palatable", "succulent", "juicy", "sweet", "rich", "creamy", "buttery", "aromatic",
-    "fresh", "authentic", "traditional", "homemade", "artisanal", "handcrafted",
-    
-    // Experience & Service
-    "love", "adore", "enjoy", "cherish", "treasure", "favorite", "best", "recommend", "must-try",
-    "worth", "valuable", "satisfying", "pleasing", "delightful", "enjoyable", "pleasurable",
-    "memorable", "unforgettable", "extraordinary", "unique", "special", "exclusive",
-    
-    // Health & Ingredients
-    "healthy", "nutritious", "wholesome", "organic", "natural", "fresh", "pure", "clean",
-    "authentic", "traditional", "herbal", "ayurvedic", "medicinal", "beneficial", "healing",
-    
-    // Packaging & Delivery
-    "beautiful", "elegant", "attractive", "professional", "secure", "fast", "quick", "timely",
-    "prompt", "efficient", "reliable", "trustworthy", "consistent", "dependable", "smooth",
-    
-    // Emotional
-    "happy", "joy", "bliss", "ecstatic", "thrilled", "excited", "satisfied", "content",
-    "grateful", "thankful", "appreciate", "blessed", "lucky", "fortunate",
-    
-    // Comparative
-    "better", "improved", "enhanced", "upgraded", "superior", "premium", "luxurious", "gourmet",
-    "artisanal", "handmade", "crafted", "custom", "personalized",
-    
-    // Specific to sweets
-    "crunchy", "crispy", "soft", "moist", "melting", "smooth", "creamy", "buttery",
-    "fragrant", "aromatic", "floral", "spiced", "balanced", "perfectly sweet", "not too sweet",
-    "addictive", "irresistible", "crave-worthy", "must-have", "staple", "regular",
-    
-    // Service & Support
-    "helpful", "friendly", "courteous", "polite", "knowledgeable", "responsive", "attentive",
-    "caring", "thoughtful", "generous", "accommodating", "flexible", "understanding"
-  ]
+// Recharts imports
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts"
 
-  const negativeWords = [
-    // Quality Issues
-    "bad", "poor", "terrible", "awful", "horrible", "disappointing", "unpleasant", "mediocre",
-    "subpar", "inferior", "low-quality", "cheap", "tasteless", "bland", "flavorless", "boring",
-    "uninspiring", "ordinary", "average", "meh", "okay", "so-so", "nothing special",
-    
-    // Taste Problems
-    "stale", "old", "rancid", "sour", "bitter", "salty", "spicy", "overcooked", "undercooked",
-    "burnt", "charred", "raw", "unripe", "overripe", "fermented", "spoiled", "rotten",
-    "artificial", "chemical", "processed", "synthetic", "fake", "imitation",
-    
-    // Too Much/Little
-    "too sweet", "overly sweet", "excessively sweet", "cloying", "sickening", "nauseating",
-    "too salty", "too spicy", "too bland", "too dry", "too moist", "too hard", "too soft",
-    "too small", "too big", "uneven", "inconsistent", "variable", "unreliable",
-    
-    // Emotional
-    "hate", "dislike", "detest", "loathe", "despise", "regret", "disappointed", "upset",
-    "angry", "frustrated", "annoyed", "irritated", "disgusted", "repulsed", "offended",
-    
-    // Service Issues
-    "late", "delayed", "slow", "tardy", "unreliable", "inconsistent", "poor service",
-    "rude", "impolite", "unhelpful", "unresponsive", "ignorant", "incompetent", "careless",
-    "negligent", "sloppy", "messy", "dirty", "unclean", "unhygienic",
-    
-    // Packaging & Delivery
-    "damaged", "broken", "crushed", "smashed", "torn", "ripped", "leaking", "spilled",
-    "melted", "spoiled", "warm", "hot", "cold", "frozen", "improper", "wrong", "incorrect",
-    "missing", "incomplete", "partial", "short", "less", "underweight",
-    
-    // Health Concerns
-    "unhealthy", "fatty", "greasy", "oily", "heavy", "indigestible", "upset stomach",
-    "allergic", "reaction", "rash", "sick", "ill", "poisonous", "contaminated",
-    
-    // Value & Price
-    "expensive", "overpriced", "costly", "pricey", "not worth", "waste", "wasted", "useless",
-    "pointless", "meaningless", "unnecessary", "excessive", "extravagant", "luxury",
-    
-    // Specific Issues
-    "hard", "tough", "chewy", "rubbery", "gummy", "sticky", "gooey", "slimy", "mushy",
-    "soggy", "wet", "dry", "crumbly", "powdery", "grainy", "sandy", "gritty",
-    "burnt taste", "smoky", "charred", "bitter aftertaste", "unpleasant aftertaste",
-    
-    // Expectations
-    "not as described", "different", "unexpected", "surprising", "shocking", "unbelievable",
-    "false", "misleading", "deceptive", "fraud", "scam", "cheat", "trick",
-    
-    // Comparative
-    "worse", "inferior", "poorer", "weaker", "lesser", "cheaper", "lower quality"
-  ]
+// --- LARGE SENTIMENT LEXICONS EMBEDDED (sampled, extendable) ---
+// NOTE: lists below are extensive (hundreds of tokens each). You can expand them if needed.
+// For performance we lowercase everything during check.
+const positiveWords = [
+  "good","great","excellent","amazing","awesome","superb","lovely","love","liked","delicious","tasty","fresh",
+  "clean","perfect","nice","pleasant","satisfied","satisfying","pleasantly","recommend","recommendation","recommendable",
+  "best","better","worth","worthwhile","value","valuefor","valueable","quality","premium","authentic","organic","natural",
+  "healthy","nutritious","crunchy","crispy","soft","fluffy","light","lightweight","refreshing","yummy","fingerlicking",
+  "flavourful","flavorful","heavenly","fantastic","phenomenal","spectacular","impressive","joy","joyful","delight","delighted",
+  "delightful","pleasantly","enjoy","enjoyed","enjoyable","savor","savory","savoury","savour","satisfy","satisfying",
+  "appreciate","appreciated","perfectly","smooth","consistent","authenticity","freshness","homemade","handmade","artisanal",
+  "homely","traditional","classic","wholesome","clean-tasting","deluxe","lovely","lovingly","cared","care","careful",
+  "onpoint","on point","nicepack","nicely","generous","plenty","valuepack","reliable","dependable","trust","trusted",
+  "friendly","fast","prompt","punctual","on-time","ontime","securely","intact","intactly","crisp","crisper","buttery",
+  "butterscotch","golden","marvelous","marvellous","tender","succulent","fragrant","fruity","aromatic","floral",
+  "balanced","balancedtaste","homestyle","housemade","homemade","kidfriendly","kid-friendly","familyfriendly","family-friendly",
+  "guilt-free","guiltfree","lowcalorie","low-calorie","lowfat","low-fat","sugarfree","sugar-free","jaggery","gur","pure",
+  "cleanlabel","clean-label","noadditives","nopreservatives","nopreservative","nonfried","airfried","air-fried","ovenbaked",
+  "oven-baked","crispyfresh","artisan","local","farmfresh","farm-fresh","community","sourced","sourcedlocally","sustainable",
+  "lovelypackaging","beautifulpackaging","giftable","perfectgift","present","treat","treats","celebration","festival","festive",
+  "valueforprice","valuefor-money","economical","niceportion","portion","generousportions","economy","saver","savers"
+  // ... add more as needed
+]
 
-  const t = text.toLowerCase()
-  let score = 0
-  
-  // Check for positive words with weights
-  positiveWords.forEach((w) => {
-    if (t.includes(w.toLowerCase())) {
-      if (["love", "best", "perfect", "excellent", "amazing"].includes(w)) {
-        score += 2
-      } else if (["great", "wonderful", "fantastic", "outstanding"].includes(w)) {
-        score += 1.5
-      } else {
-        score += 1
+const negativeWords = [
+  "bad","worst","awful","terrible","disgusting","stale","stale-taste","stale taste","soggy","soft","hard","rockhard",
+  "overcooked","undercooked","burnt","burnt-taste","burnt taste","bland","tasteless","too sweet","too salty","too sour",
+  "expensive","overpriced","ripoff","rip-off","thin","small","short","broken","damaged","leaking","leakage","mold","mould",
+  "smell","smelly","odor","odour","rutty","rotten","spoiled","spoil","unfresh","notfresh","old","expired","pastdate",
+  "cold","not warm","lukewarm","badpackaging","poorpackaging","late","delayed","delay","missing","lost","notreceived",
+  "not arrived","disappointed","disappointing","disappointment","refund","return","returned","returning","complaint",
+  "complain","problem","issue","issues","worstexperience","neverbuy","never again","regret","regretted","poor","poorly",
+  "inconsistent","inconsistency","declined","damagedbox","brokenpack","mishandled","terribleservice","rude","rudeness",
+  "notgood","not nice","notnice","nothappy","unhappy","unpleasant","unsatisfied","unsatisfactory","horrible","horrendous",
+  "forgettable","sour","bitter","acidic","oily","greasy","grease","too oily","soggy","moisture","moist","waterlogged",
+  "mushy","chewy","chew","notfreshness","scam","fake","counterfeit","spoilt","tainted","contaminated","unsafe","allergic",
+  "allergy","stomach","sick","upset","vomit","vomited","pain","hurt","sore","sour","burn","burning","sour","cheap","cheaply",
+  "worstpack","badpack","noresponse","no reply","no communication","neverreply","no support","unable","cant","can't","cannot"
+  // ... add more as needed
+]
+
+// Normalize lists to sets for fast lookup
+const POS_SET = new Set(positiveWords.map((s) => s.toLowerCase()))
+const NEG_SET = new Set(negativeWords.map((s) => s.toLowerCase()))
+
+// Utility to extract top keywords from comment list
+function topKeywordsFromComments(comments: any[], sentiment: "Positive" | "Negative", topN = 6) {
+  const freq: Record<string, number> = {}
+  comments.forEach((c) => {
+    if (c.sentiment !== sentiment) return
+    const text = (c.text || "").toLowerCase()
+    const tokens = text.split(/[^a-z0-9]+/).filter(Boolean)
+    tokens.forEach((t: string) => {
+      if (t.length <= 2) return
+      if (POS_SET.has(t) || NEG_SET.has(t)) {
+        freq[t] = (freq[t] || 0) + 1
       }
-    }
+    })
   })
-  
-  // Check for negative words with weights
-  negativeWords.forEach((w) => {
-    if (t.includes(w.toLowerCase())) {
-      if (["hate", "worst", "terrible", "awful", "disgusting"].includes(w)) {
-        score -= 2
-      } else if (["bad", "poor", "disappointing", "unpleasant"].includes(w)) {
-        score -= 1.5
-      } else {
-        score -= 1
-      }
-    }
-  })
-  
-  // Check for negations
-  const negations = ["not ", "no ", "never ", "don't ", "doesn't ", "didn't ", "isn't ", "aren't ", "wasn't ", "weren't "]
-  negations.forEach((neg) => {
-    if (t.includes(neg)) {
-      positiveWords.forEach((pw) => {
-        if (t.includes(neg + pw.toLowerCase())) {
-          score -= 1.5
-        }
-      })
-      negativeWords.forEach((nw) => {
-        if (t.includes(neg + nw.toLowerCase())) {
-          score += 1
-        }
-      })
-    }
-  })
-  
-  // Determine sentiment based on score
-  if (score > 2) return "Very Positive"
-  if (score > 0) return "Positive"
-  if (score < -2) return "Very Negative"
-  if (score < 0) return "Negative"
-  return "Neutral"
+  const arr = Object.entries(freq).sort((a, b) => b[1] - a[1])
+  return arr.slice(0, topN).map((x) => x[0])
 }
 
+// Advanced analyzer: handle negation and phrase matching
+function analyzeSentiment(text: string): "Positive" | "Negative" {
+  if (!text || !text.trim()) return "Positive"
+
+  const t = text.toLowerCase()
+
+  // Quick explicit negative checks
+  const explicitNegativePhrases = ["never buy", "never again", "not buying", "do not buy", "do n't buy", "dont buy", "return this", "refund please", "worst ever", "worst experience", "do not order"]
+  for (const p of explicitNegativePhrases) {
+    if (t.includes(p)) return "Negative"
+  }
+
+  // tokenization and sliding window phrase detection
+  const tokens = t.split(/[^a-z0-9]+/).filter(Boolean)
+
+  let score = 0
+
+  // weights
+  const POS_WEIGHT = 1
+  const NEG_WEIGHT = 1.5 // penalize negatives a bit more for business safety
+
+  // check for multi-word phrases first (two-word)
+  for (let i = 0; i < tokens.length; i++) {
+    const unigram = tokens[i]
+    const bigram = i < tokens.length - 1 ? `${tokens[i]} ${tokens[i+1]}` : null
+
+    // negation context: look for "not", "never", "no" within 2 tokens before positive
+    const prev2 = (i >= 2 ? `${tokens[i-2]} ${tokens[i-1]}` : "")
+    const prev1 = (i >= 1 ? tokens[i-1] : "")
+
+    // bigram check
+    if (bigram) {
+      if (NEG_SET.has(bigram)) {
+        score -= NEG_WEIGHT * 2
+        continue
+      }
+      if (POS_SET.has(bigram)) {
+        // if negation before bigram, invert
+        if (prev1 === "not" || prev1 === "never" || prev2.includes("not")) {
+          score -= POS_WEIGHT * 2
+        } else {
+          score += POS_WEIGHT * 2
+        }
+        continue
+      }
+    }
+
+    // unigram checks
+    if (POS_SET.has(unigram)) {
+      // check negation proximity
+      const negNearby = prev1 === "not" || prev1 === "never" || (i + 1 < tokens.length && tokens[i+1] === "not")
+      if (negNearby) {
+        score -= POS_WEIGHT
+      } else {
+        score += POS_WEIGHT
+      }
+    }
+
+    if (NEG_SET.has(unigram)) {
+      // check negation proximity: e.g., "not bad" -> counts positive
+      const negNearby = prev1 === "not" || prev1 === "never" || (i + 1 < tokens.length && tokens[i+1] === "not")
+      if (negNearby) {
+        score += NEG_WEIGHT // "not bad" => positive tilt
+      } else {
+        score -= NEG_WEIGHT
+      }
+    }
+  }
+
+  // final threshold rules: if score is 0, examine exclamation, emoticons, rating words
+  if (score === 0) {
+    if (/[!]{1,}/.test(text)) return "Positive"
+    const lower = text.toLowerCase()
+    if (lower.includes("not good") || lower.includes("not great") || lower.includes("poor") || lower.includes("disappointed")) {
+      return "Negative"
+    }
+    // default to Positive for business
+    return "Positive"
+  }
+
+  return score > 0 ? "Positive" : "Negative"
+}
+
+// initials helper
+function initials(name: string) {
+  if (!name) return "U"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+// comment item type
+type CommentItem = {
+  id: number
+  name: string
+  text: string
+  rating: number
+  sentiment: "Positive" | "Negative"
+  timestamp: string
+  likes: number
+}
+
+// COMPONENT
 export function CommentsSection() {
-  const [comments, setComments] = useState<any[]>([])
+  const [comments, setComments] = useState<CommentItem[]>([])
   const [newComment, setNewComment] = useState("")
   const [name, setName] = useState("")
   const [rating, setRating] = useState(5)
-  const [liked, setLiked] = useState<number[]>([])
+  const [likedIds, setLikedIds] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState<"all" | "positive" | "negative">("all")
+  const [analyzing, setAnalyzing] = useState(false)
 
-  // INSIGHT DATA
-  const [positivePercent, setPositivePercent] = useState(0)
-  const [negativePercent, setNegativePercent] = useState(0)
-  const [topPositive, setTopPositive] = useState<string[]>([])
-  const [topNegative, setTopNegative] = useState<string[]>([])
-
-  // LOAD COMMENTS
+  // load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("comments")
     if (stored) {
       try {
         const arr = JSON.parse(stored)
         setComments(arr)
-        updateInsights(arr)
-      } catch (error) {
-        console.error("Failed to parse comments from localStorage:", error)
+      } catch {
+        setComments([])
       }
     }
   }, [])
 
-  // UPDATE INSIGHTS
-  const updateInsights = (list: any[]) => {
-    const pos = list.filter((c) => c.sentiment === "Positive" || c.sentiment === "Very Positive")
-    const neg = list.filter((c) => c.sentiment === "Negative" || c.sentiment === "Very Negative")
-    const total = list.length
+  // persist
+  useEffect(() => {
+    localStorage.setItem("comments", JSON.stringify(comments))
+  }, [comments])
 
-    setPositivePercent(total ? (pos.length / total) * 100 : 0)
-    setNegativePercent(total ? (neg.length / total) * 100 : 0)
+  // derived lists & metrics
+  const positive = useMemo(() => comments.filter((c) => c.sentiment === "Positive"), [comments])
+  const negative = useMemo(() => comments.filter((c) => c.sentiment === "Negative"), [comments])
+  const total = comments.length
+  const positivePercent = total ? (positive.length / total) * 100 : 0
+  const negativePercent = total ? (negative.length / total) * 100 : 0
 
-    setTopPositive(pos.slice(0, 5).map((c) => c.text))
-    setTopNegative(neg.slice(0, 5).map((c) => c.text))
-  }
+  // pie chart data for recharts
+  const pieData = [
+    { name: "Positive", value: positive.length, color: "#10b981" },
+    { name: "Negative", value: negative.length, color: "#ef4444" },
+  ]
 
-  // ADD COMMENT
+  // top keywords/phrases
+  const topPosKeywords = topKeywordsFromComments(comments, "Positive", 6)
+  const topNegKeywords = topKeywordsFromComments(comments, "Negative", 6)
+
+  // add comment (client-side sentiment analysis)
   const handleAddComment = () => {
-    if (!newComment.trim() || !name.trim()) return
-
-    const sentiment = analyzeSentiment(newComment)
-
-    const comment = {
+    if (!name.trim() || !newComment.trim()) return
+    setAnalyzing(true)
+    // synchronous analyzer (fast)
+    const sentiment = analyzeSentiment(newComment.trim())
+    const comment: CommentItem = {
       id: Date.now(),
-      name,
-      text: newComment,
+      name: name.trim(),
+      text: newComment.trim(),
       rating,
       sentiment,
-      timestamp: new Date().toLocaleDateString(),
+      timestamp: new Date().toLocaleString(),
       likes: 0,
     }
-
-    const updated = [comment, ...comments]
-    setComments(updated)
-    localStorage.setItem("comments", JSON.stringify(updated))
-
-    updateInsights(updated)
-
+    setComments((p) => [comment, ...p])
     setNewComment("")
     setName("")
     setRating(5)
+    setAnalyzing(false)
   }
 
-  // LIKE BUTTON
   const toggleLike = (id: number) => {
-    if (liked.includes(id)) {
-      setLiked(liked.filter((i) => i !== id))
-    } else {
-      setLiked([...liked, id])
-    }
+    const isLiked = likedIds.includes(id)
+    setLikedIds((prev) => 
+      isLiked ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c
+        return { 
+          ...c, 
+          likes: isLiked ? Math.max(0, c.likes - 1) : c.likes + 1 
+        }
+      })
+    )
   }
 
-  // FILTERS FOR TABS
-  const filteredComments =
-    activeTab === "all"
-      ? comments
-      : comments.filter((c) => {
-          if (activeTab === "positive") {
-            return c.sentiment === "Positive" || c.sentiment === "Very Positive"
-          } else {
-            return c.sentiment === "Negative" || c.sentiment === "Very Negative"
-          }
-        })
+  const filteredComments = useMemo(() => {
+    if (activeTab === "all") return comments
+    return activeTab === "positive" ? positive : negative
+  }, [activeTab, comments, positive, negative])
 
   return (
     <section className="w-full py-20 md:py-28 px-4 sm:px-6 lg:px-8 bg-secondary/5">
       <div className="max-w-7xl mx-auto">
-
-        {/* TITLE */}
         <div className="text-center mb-12">
           <h2 className="font-serif text-4xl md:text-5xl font-bold mb-4">Share Your Thoughts</h2>
           <p className="text-lg text-muted-foreground">Help us improve by sharing your feedback</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* COMMENT INPUT */}
+          {/* Form */}
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-24">
               <h3 className="text-xl font-semibold mb-4">Leave a Comment</h3>
 
               <div className="space-y-4">
-
-                {/* NAME */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Your Name</label>
                   <input
@@ -271,20 +290,18 @@ export function CommentsSection() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name"
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                    className="w-full px-3 py-2 border border-border rounded-lg"
                   />
                 </div>
 
-                {/* RATING */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Rating</label>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        onClick={() => setRating(star)}
-                        type="button"
-                        className={`text-2xl transition ${star <= rating ? "text-primary" : "text-muted-foreground"}`}
+                      <button 
+                        key={star} 
+                        onClick={() => setRating(star)} 
+                        className={`text-2xl ${star <= rating ? "text-primary" : "text-muted"}`}
                       >
                         ★
                       </button>
@@ -292,185 +309,164 @@ export function CommentsSection() {
                   </div>
                 </div>
 
-                {/* COMMENT */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Your Comment</label>
                   <textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Share your experience..."
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background resize-none h-24"
+                    className="w-full px-3 py-2 border border-border rounded-lg resize-none h-24"
                   />
                 </div>
 
-                {/* POST BUTTON */}
-                <Button
-                  onClick={handleAddComment}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                <Button 
+                  onClick={handleAddComment} 
+                  disabled={!newComment.trim() || !name.trim() || analyzing}
                 >
-                  Post Comment
+                  {analyzing ? "Analyzing..." : "Post Comment"}
                 </Button>
               </div>
             </Card>
           </div>
 
-          {/* RIGHT SIDE — INSIGHTS + COMMENTS */}
+          {/* Insights + Comments */}
           <div className="lg:col-span-2 space-y-6">
-
-            {/* INSIGHT BOX */}
+            {/* Insights Card */}
             <Card className="p-6 border border-border/40">
-              <h3 className="text-xl font-semibold mb-4">Comment Insights</h3>
-
-              <div className="flex items-center gap-6 mb-4">
-                <div className="flex items-center gap-2">
-                  <FaThumbsUp className="w-5 h-5 text-green-500" />
-                  <p className="text-sm">
-                    Positive: <strong>{positivePercent.toFixed(1)}%</strong>
-                  </p>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold">Comment Insights</h3>
+                  <p className="text-sm text-muted-foreground">Real-time sentiment summary for this product</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <FaThumbsDown className="w-5 h-5 text-red-500" />
-                  <p className="text-sm">
-                    Negative: <strong>{negativePercent.toFixed(1)}%</strong>
-                  </p>
+
+                <div style={{ width: 220, height: 160 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={40}
+                        outerRadius={60}
+                        paddingAngle={3}
+                        label
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* POSITIVE INSIGHTS */}
+              <div className="mt-4 grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-semibold mb-2">What Positive Users Say</h4>
+                  <h4 className="font-semibold mb-2">Top Positive Keywords</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    {topPositive.length === 0 ? (
-                      <li>No positive comments yet</li>
-                    ) : (
-                      topPositive.map((t, i) => <li key={i}>• {t}</li>)
-                    )}
+                    {topPosKeywords.length === 0 ? 
+                      <li>No positive keywords yet</li> : 
+                      topPosKeywords.map((k) => <li key={k}>• {k}</li>)
+                    }
                   </ul>
                 </div>
 
-                {/* NEGATIVE INSIGHTS */}
                 <div>
-                  <h4 className="font-semibold mb-2">What Negative Users Say</h4>
+                  <h4 className="font-semibold mb-2">Top Negative Keywords</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    {topNegative.length === 0 ? (
-                      <li>No negative comments yet</li>
-                    ) : (
-                      topNegative.map((t, i) => <li key={i}>• {t}</li>)
-                    )}
+                    {topNegKeywords.length === 0 ? 
+                      <li>No negative keywords yet</li> : 
+                      topNegKeywords.map((k) => <li key={k}>• {k}</li>)
+                    }
                   </ul>
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-6">
+                <div>
+                  <div className="text-sm text-muted-foreground">Total Comments</div>
+                  <div className="font-semibold text-lg">{total}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Positive</div>
+                  <div className="font-semibold text-lg text-green-600">{positivePercent.toFixed(1)}%</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Negative</div>
+                  <div className="font-semibold text-lg text-red-600">{negativePercent.toFixed(1)}%</div>
                 </div>
               </div>
             </Card>
 
-            {/* TABS */}
+            {/* Tabs */}
             <div className="flex gap-4">
-              <button
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === "all" 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-background border hover:bg-secondary/20"
-                }`}
+              <button 
+                className={`px-4 py-2 rounded ${activeTab === "all" ? "bg-primary text-white" : "bg-background border"}`} 
                 onClick={() => setActiveTab("all")}
-                type="button"
               >
                 All
               </button>
-              <button
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === "positive" 
-                    ? "bg-green-500 text-white" 
-                    : "bg-background border hover:bg-secondary/20"
-                }`}
+              <button 
+                className={`px-4 py-2 rounded ${activeTab === "positive" ? "bg-green-500 text-white" : "bg-background border"}`} 
                 onClick={() => setActiveTab("positive")}
-                type="button"
               >
                 Positive
               </button>
-              <button
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === "negative" 
-                    ? "bg-red-500 text-white" 
-                    : "bg-background border hover:bg-secondary/20"
-                }`}
+              <button 
+                className={`px-4 py-2 rounded ${activeTab === "negative" ? "bg-red-500 text-white" : "bg-background border"}`} 
                 onClick={() => setActiveTab("negative")}
-                type="button"
               >
                 Negative
               </button>
             </div>
 
-            {/* COMMENT LIST */}
+            {/* Comments list */}
             {filteredComments.length === 0 ? (
               <Card className="p-12 text-center">
-                <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <MessageCircle className="w-12 h-12 text-muted mx-auto mb-4" />
                 <p className="text-muted-foreground">No comments yet.</p>
               </Card>
             ) : (
-              filteredComments.map((comment) => (
-                <Card
-                  key={comment.id}
-                  className={`p-6 hover:shadow-lg transition-shadow border-2 ${
-                    comment.sentiment === "Positive" || comment.sentiment === "Very Positive"
-                      ? "border-green-400/30 hover:border-green-400" 
-                      : "border-red-400/30 hover:border-red-400"
-                  }`}
+              filteredComments.map((c) => (
+                <Card 
+                  key={c.id} 
+                  className={`p-6 hover:shadow-lg transition-shadow border-2 ${c.sentiment === "Positive" ? "border-green-400" : "border-red-400"}`}
                 >
-                  {/* TOP INFO */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-semibold">{comment.name}</h4>
-                      <p className="text-xs text-muted-foreground">{comment.timestamp}</p>
+                  <div className="flex items-start justify-between mb-3 gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold">
+                        {initials(c.name)}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{c.name}</div>
+                        <div className="text-xs text-muted-foreground">{c.timestamp}</div>
+                      </div>
                     </div>
 
-                    {/* RATING */}
                     <div className="flex gap-1">
-                      {Array(comment.rating)
-                        .fill(0)
-                        .map((_, i) => (
-                          <span key={i} className="text-primary text-sm">
-                            ★
-                          </span>
-                        ))}
+                      {Array.from({ length: c.rating }).map((_, i) => (
+                        <span key={i} className="text-primary text-sm">★</span>
+                      ))}
                     </div>
                   </div>
 
-                  {/* TEXT */}
-                  <p className="text-muted-foreground leading-relaxed mb-4">
-                    {comment.text}
-                  </p>
+                  <p className="mb-4 text-muted-foreground">{c.text}</p>
 
-                  {/* SENTIMENT BADGE */}
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="flex items-center gap-2">
-                      {(comment.sentiment === "Positive" || comment.sentiment === "Very Positive") ? (
-                        <FaThumbsUp className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <FaThumbsDown className="w-4 h-4 text-red-500" />
-                      )}
-                      <span className={`text-xs font-medium px-2 py-1 rounded ${
-                        comment.sentiment === "Very Positive" ? "bg-green-100 text-green-800" :
-                        comment.sentiment === "Positive" ? "bg-green-50 text-green-700" :
-                        comment.sentiment === "Very Negative" ? "bg-red-100 text-red-800" :
-                        "bg-red-50 text-red-700"
-                      }`}>
-                        {comment.sentiment}
-                      </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => toggleLike(c.id)} 
+                        className={`flex items-center gap-2 text-sm ${likedIds.includes(c.id) ? "text-primary" : "text-muted-foreground"}`}
+                      >
+                        <Heart className={`w-4 h-4 ${likedIds.includes(c.id) ? "fill-current" : ""}`} />
+                        Helpful ({c.likes})
+                      </button>
+                      <div className={`text-xs px-2 py-1 rounded ${c.sentiment === "Positive" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                        {c.sentiment}
+                      </div>
                     </div>
-
-                    {/* LIKE BUTTON */}
-                    <button
-                      onClick={() => toggleLike(comment.id)}
-                      type="button"
-                      className={`flex items-center gap-2 text-sm transition-colors ${
-                        liked.includes(comment.id)
-                          ? "text-primary"
-                          : "text-muted-foreground hover:text-primary"
-                      }`}
-                    >
-                      <Heart className={`w-4 h-4 ${liked.includes(comment.id) ? "fill-current" : ""}`} />
-                      Helpful
-                    </button>
                   </div>
                 </Card>
               ))
