@@ -3,7 +3,9 @@ import { verifyToken } from '@/lib/auth';
 
 export default async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
-
+  
+  console.log('Proxy middleware - Path:', path);
+  
   // Public paths that don't require authentication
   const publicPaths = [
     '/',
@@ -18,28 +20,30 @@ export default async function proxy(request: NextRequest) {
     '/api/auth/verify',
     '/api/auth/logout',
     '/api/products',
+    '/api/debug',
   ];
 
   // Check if path is public
-  if (publicPaths.includes(path) || 
+  const isPublicPath = publicPaths.includes(path) || 
       path.startsWith('/_next/') || 
       path.startsWith('/static/') ||
-      path.startsWith('/public/')) {
+      path.startsWith('/public/') ||
+      path.startsWith('/api/auth/') ||
+      (path.startsWith('/api/products') && request.method === 'GET');
+
+  if (isPublicPath) {
+    console.log('Public path, allowing access');
     return NextResponse.next();
   }
 
-  // Check for API routes that need auth
+  // Get token from cookie
+  const token = request.cookies.get('ghoroa-token')?.value;
+  console.log('Token in cookie:', token ? 'Present' : 'Missing');
+
+  // Check for API routes
   if (path.startsWith('/api/')) {
-    // Skip auth check for public API routes
-    if (path.startsWith('/api/auth/') || 
-        path.startsWith('/api/products') && request.method === 'GET') {
-      return NextResponse.next();
-    }
-
-    const token = request.headers.get('authorization')?.replace('Bearer ', '') || 
-                  request.cookies.get('ghoroa-token')?.value;
-
     if (!token) {
+      console.log('No token for API route, returning 401');
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
         { status: 401 }
@@ -48,12 +52,15 @@ export default async function proxy(request: NextRequest) {
 
     const decoded = verifyToken(token);
     if (!decoded) {
+      console.log('Invalid token for API route, returning 401');
       return NextResponse.json(
         { success: false, error: 'Invalid or expired token' },
         { status: 401 }
       );
     }
 
+    console.log('API token verified, user ID:', decoded.userId);
+    
     // Add user info to request headers
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-user-id', decoded.userId);
@@ -65,22 +72,39 @@ export default async function proxy(request: NextRequest) {
     });
   }
 
-  // For page routes, check auth token
-  const token = request.cookies.get('ghoroa-token')?.value;
-  
-  if (!token) {
-    // Redirect to login if not authenticated
-    const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('redirect', path);
-    return NextResponse.redirect(loginUrl);
-  }
+  // For protected page routes, check auth token
+  const protectedPages = [
+    '/account',
+    '/cart', 
+    '/checkout',
+    '/admin',
+  ];
 
-  const decoded = verifyToken(token);
-  if (!decoded) {
-    // Clear invalid token and redirect to login
-    const response = NextResponse.redirect(new URL('/auth/login', request.url));
-    response.cookies.delete('ghoroa-token');
-    return response;
+  const isProtectedPage = protectedPages.some(protectedPath => 
+    path.startsWith(protectedPath)
+  );
+
+  if (isProtectedPage) {
+    console.log('Protected page access attempt:', path);
+    
+    if (!token) {
+      console.log('No token, redirecting to login');
+      // Redirect to login if not authenticated
+      const loginUrl = new URL('/auth/login', request.url);
+      loginUrl.searchParams.set('redirect', path);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      console.log('Invalid token, redirecting to login');
+      // Clear invalid token and redirect to login
+      const response = NextResponse.redirect(new URL('/auth/login', request.url));
+      response.cookies.delete('ghoroa-token');
+      return response;
+    }
+
+    console.log('Page access granted for user:', decoded.userId);
   }
 
   return NextResponse.next();
@@ -88,13 +112,15 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Only protect specific paths
     '/account/:path*',
     '/cart/:path*',
     '/checkout/:path*',
     '/admin/:path*',
-    '/api/cart/:path*',
+    // Protect API routes except auth and public ones
     '/api/orders/:path*',
     '/api/users/:path*',
     '/api/admin/:path*',
+    '/api/cart/:path*',
   ],
 };
