@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
+    console.log('Login attempt for email:', email);
+    console.log('Request origin:', request.headers.get('origin'));
+
     // Validate input
     if (!email || !password) {
       return NextResponse.json(
@@ -21,27 +24,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user
-    const user = await User.findOne({ email }).select('+password'); // Important: select password field
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('User not found for email:', email);
       return NextResponse.json(
         { success: false, error: 'Invalid credentials' },
         { status: 401 }
       );
     }
+
+    console.log('User found, verifying password...');
 
     // Verify password
     const isValid = await verifyPassword(password, user.password);
     if (!isValid) {
+      console.log('Password verification failed');
       return NextResponse.json(
         { success: false, error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
+    console.log('Password verified successfully, generating token...');
+
     // Generate token
     const token = generateToken(user._id.toString());
     
-    // Create response with user data (remove password)
+    // Create response with user data
     const userResponse = {
       _id: user._id,
       name: user.name,
@@ -68,6 +77,14 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
+
+    // Add CORS headers for Vercel
+    response.headers.set('Access-Control-Allow-Origin', request.headers.get('origin') || '*');
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    console.log('Login successful, cookie set with CORS headers');
 
     return response;
   } catch (error: any) {

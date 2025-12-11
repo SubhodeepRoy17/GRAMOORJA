@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Public paths that don't require authentication
@@ -16,18 +16,26 @@ export default async function middleware(request: NextRequest) {
     '/api/auth/login',
     '/api/auth/signup',
     '/api/auth/verify',
+    '/api/auth/logout',
     '/api/products',
   ];
 
   // Check if path is public
   if (publicPaths.includes(path) || 
       path.startsWith('/_next/') || 
-      path.startsWith('/static/')) {
+      path.startsWith('/static/') ||
+      path.startsWith('/public/')) {
     return NextResponse.next();
   }
 
   // Check for API routes that need auth
   if (path.startsWith('/api/')) {
+    // Skip auth check for public API routes
+    if (path.startsWith('/api/auth/') || 
+        path.startsWith('/api/products') && request.method === 'GET') {
+      return NextResponse.next();
+    }
+
     const token = request.headers.get('authorization')?.replace('Bearer ', '') || 
                   request.cookies.get('ghoroa-token')?.value;
 

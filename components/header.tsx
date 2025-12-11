@@ -12,38 +12,40 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true) // Start with loading true
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
 
   const checkAuthStatus = async () => {
     try {
       setLoading(true)
+      console.log('Checking auth status from:', window.location.origin)
+      
       const response = await fetch('/api/auth/verify', {
         method: 'GET',
-        credentials: 'include', // THIS IS CRITICAL
+        credentials: 'include', // This is CRITICAL
         headers: {
           'Content-Type': 'application/json',
         },
       })
       
       console.log('Verify response status:', response.status)
+      console.log('Verify response ok:', response.ok)
       
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Verify response data:', data)
-        
-        if (data.success && data.user) {
-          setUser(data.user)
-          setIsLoggedIn(true)
-        } else {
-          setIsLoggedIn(false)
-          setUser(null)
-        }
+      const data = await response.json()
+      console.log('Verify response data:', data)
+      
+      if (response.ok && data.success && data.user) {
+        setUser(data.user)
+        setIsLoggedIn(true)
+        console.log('User is logged in:', data.user.email)
       } else {
-        console.log('Verify failed with status:', response.status)
+        console.log('User is not logged in or verification failed:', data.error)
         setIsLoggedIn(false)
         setUser(null)
+        
+        // Clear any stale localStorage data
+        localStorage.removeItem('user')
       }
     } catch (error) {
       console.error('Auth check error:', error)
@@ -63,7 +65,7 @@ export function Header() {
       setLoading(true)
       const response = await fetch('/api/auth/logout', { 
         method: 'POST',
-        credentials: 'include', // THIS IS CRITICAL
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -72,15 +74,16 @@ export function Header() {
       console.log('Logout response status:', response.status)
       
       if (response.ok) {
-        const data = await response.json()
-        console.log('Logout response data:', data)
-        
         toast.success('Logged out successfully')
         setIsLoggedIn(false)
         setUser(null)
         setIsOpen(false)
         
-        // Force a full page reload to clear any cached state
+        // Clear localStorage
+        localStorage.removeItem('user')
+        localStorage.removeItem('adminPass')
+        
+        // Force a full page reload to clear everything
         window.location.href = '/'
       } else {
         toast.error('Logout failed')

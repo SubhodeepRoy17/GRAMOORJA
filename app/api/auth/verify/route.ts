@@ -4,11 +4,14 @@ import User from '@/lib/models/User';
 import { verifyToken } from '@/lib/auth';
 
 // IMPORTANT: Specify Node.js runtime instead of Edge
-export const runtime = 'nodejs'; // This forces Node.js runtime
+export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
   try {
     console.log('Verify endpoint called (Node.js runtime)');
+    console.log('Request origin:', request.headers.get('origin'));
+    console.log('Request referer:', request.headers.get('referer'));
+    console.log('All cookies:', request.cookies.getAll());
     
     // Get token from cookie
     const token = request.cookies.get('ghoroa-token')?.value;
@@ -50,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     console.log('User found:', user.email);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         _id: user._id,
@@ -62,6 +65,14 @@ export async function GET(request: NextRequest) {
         createdAt: user.createdAt,
       },
     });
+
+    // Add CORS headers for Vercel
+    response.headers.set('Access-Control-Allow-Origin', request.headers.get('origin') || '*');
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    return response;
   } catch (error: any) {
     console.error('Verify auth error:', error);
     return NextResponse.json(

@@ -38,16 +38,23 @@ export function verifyToken(token: string): { userId: string } | null {
 
 // Server-side cookie setting (for API routes)
 export function setAuthCookie(token: string, response: NextResponse): NextResponse {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   response.cookies.set({
     name: TOKEN_NAME,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax', // Changed from 'strict' to 'lax' for local development
+    secure: isProduction, // true for Vercel (HTTPS)
+    sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7, // 7 days
   });
-  console.log('Auth cookie set successfully');
+  
+  console.log('Auth cookie set successfully', { 
+    isProduction,
+    domain: isProduction ? '.vercel.app' : 'localhost' 
+  });
+  
   return response;
 }
 
