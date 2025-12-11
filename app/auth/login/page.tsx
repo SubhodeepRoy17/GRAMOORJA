@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -11,6 +10,7 @@ import { Card } from "@/components/ui/card"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight } from "lucide-react"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -25,20 +25,39 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const users = JSON.parse(localStorage.getItem("users") || "[]")
-      const user = users.find((u: any) => u.email === email && u.password === password)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      })
 
-      if (!user) {
-        setError("Invalid email or password")
+      const data = await response.json()
+
+      if (!data.success) {
+        setError(data.error || 'Login failed')
+        toast.error(data.error || 'Login failed')
         setLoading(false)
         return
       }
 
-      localStorage.setItem("user", JSON.stringify({ email: user.email, name: user.name }))
-      localStorage.setItem("token", "auth-token-" + Date.now())
-      router.push("/")
+      // Show success toast
+      toast.success('Login successful!')
+      
+      // Check for redirect parameter
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirectTo = urlParams.get('redirect')
+      
+      // Wait for toast to show
+      setTimeout(() => {
+        // Redirect based on user role and redirect parameter
+        window.location.href = redirectTo || '/'
+      }, 1000)
+      
     } catch (err) {
-      setError("Login failed. Please try again.")
+      console.error('Login error:', err)
+      setError('Login failed. Please try again.')
+      toast.error('Login failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -64,6 +83,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -75,6 +95,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 

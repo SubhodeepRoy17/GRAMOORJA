@@ -7,14 +7,25 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CheckCircle2, ArrowRight } from "lucide-react"
+import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+interface CartItem {
+  _id: string
+  name: string
+  price: number
+  weight: string
+  quantity: number
+}
 
 export default function CheckoutPage() {
-  const [cart, setCart] = useState<any[]>([])
+  const [cart, setCart] = useState<CartItem[]>([])
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [cartLoading, setCartLoading] = useState(true)
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -33,28 +44,45 @@ export default function CheckoutPage() {
       return
     }
 
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      const parsedCart = JSON.parse(savedCart)
-      const grouped = parsedCart.reduce((acc: any, item: any) => {
-        const existing = acc.find((i: any) => i.id === item.id)
-        if (existing) {
-          existing.quantity += item.quantity
-        } else {
-          acc.push(item)
-        }
-        return acc
-      }, [])
-      setCart(grouped)
-    }
-
+    // Load user data
     const userData = JSON.parse(user)
     setFormData((prev) => ({
       ...prev,
       fullName: userData.name,
       email: userData.email,
+      phone: userData.phone || "",
+      address: userData.address || "",
     }))
+
+    // Load cart
+    fetchCart()
   }, [router])
+
+  const fetchCart = async () => {
+    try {
+      setCartLoading(true)
+      const response = await fetch('/api/cart')
+      const data = await response.json()
+      
+      if (data.success) {
+        const cartItems = data.data?.items?.map((item: any) => ({
+          _id: item.product._id,
+          name: item.product.name,
+          price: item.product.price,
+          weight: item.product.weight,
+          quantity: item.quantity
+        })) || []
+        setCart(cartItems)
+      } else {
+        toast.error('Failed to load cart')
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error)
+      toast.error('Failed to load cart')
+    } finally {
+      setCartLoading(false)
+    }
+  }
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const tax = subtotal * 0.05
@@ -66,23 +94,37 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
-      const order = {
-        id: "ORD-" + Date.now(),
-        items: cart,
-        total,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-        ...formData,
+      const orderData = {
+        shippingAddress: {
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          pincode: formData.pincode,
+        },
+        paymentMethod: formData.paymentMethod,
       }
 
-      const orders = JSON.parse(localStorage.getItem("orders") || "[]")
-      orders.push(order)
-      localStorage.setItem("orders", JSON.stringify(orders))
-      localStorage.removeItem("cart")
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      })
 
+      const data = await response.json()
+
+      if (!data.success) {
+        toast.error(data.error || 'Failed to place order')
+        setLoading(false)
+        return
+      }
+
+      toast.success('Order placed successfully!')
       setOrderPlaced(true)
     } catch (err) {
-      console.error("Order failed:", err)
+      console.error('Order failed:', err)
+      toast.error('Failed to place order. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -100,13 +142,56 @@ export default function CheckoutPage() {
                 <h1 className="text-3xl font-bold font-serif text-primary mb-2">Order Confirmed!</h1>
                 <p className="text-muted-foreground">Thank you for your order. Track it in your account.</p>
               </div>
-              <Link href="/account">
-                <Button className="w-full bg-primary hover:bg-primary/90">
-                  View Order
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
+              <div className="space-y-3">
+                <Link href="/account">
+                  <Button className="w-full bg-primary hover:bg-primary/90">
+                    View Orders
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+                <Link href="/shop">
+                  <Button variant="outline" className="w-full">
+                    Continue Shopping
+                  </Button>
+                </Link>
+              </div>
             </Card>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  if (cartLoading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-background py-12 px-4">
+          <div className="max-w-7xl mx-auto text-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground mt-4">Loading checkout...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  if (cart.length === 0) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-background py-12 px-4">
+          <div className="max-w-7xl mx-auto text-center py-16">
+            <h1 className="text-3xl font-bold font-serif text-primary mb-4">Your cart is empty</h1>
+            <p className="text-muted-foreground mb-6">Add some sweets to your cart before checking out</p>
+            <Link href="/shop">
+              <Button className="bg-primary hover:bg-primary/90">
+                Continue Shopping
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
           </div>
         </main>
         <Footer />
@@ -128,80 +213,109 @@ export default function CheckoutPage() {
                 {/* Delivery Address */}
                 <div className="space-y-4">
                   <h2 className="text-xl font-semibold">Delivery Address</h2>
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder="Full Name"
-                      value={formData.fullName}
-                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                      className="col-span-2 px-4 py-2 border border-border rounded"
-                      required
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="col-span-2 px-4 py-2 border border-border rounded"
-                      required
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Phone Number"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="col-span-2 px-4 py-2 border border-border rounded"
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="Street Address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className="col-span-2 px-4 py-2 border border-border rounded"
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="City"
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      className="px-4 py-2 border border-border rounded"
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="Pincode"
-                      value={formData.pincode}
-                      onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                      className="px-4 py-2 border border-border rounded"
-                      required
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Full Name</label>
+                      <Input
+                        type="text"
+                        placeholder="Full Name"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Email</label>
+                      <Input
+                        type="email"
+                        placeholder="Email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Phone Number</label>
+                      <Input
+                        type="tel"
+                        placeholder="Phone Number"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Street Address</label>
+                      <Input
+                        type="text"
+                        placeholder="Street Address"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">City</label>
+                      <Input
+                        type="text"
+                        placeholder="City"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Pincode</label>
+                      <Input
+                        type="text"
+                        placeholder="Pincode"
+                        value={formData.pincode}
+                        onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                        required
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Payment Method */}
                 <div className="space-y-4">
                   <h2 className="text-xl font-semibold">Payment Method</h2>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-3 p-3 border border-primary rounded cursor-pointer">
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-secondary/10 transition-colors">
                       <input
                         type="radio"
                         name="payment"
                         value="cod"
                         checked={formData.paymentMethod === "cod"}
                         onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                        className="w-4 h-4 text-primary"
+                        disabled={loading}
                       />
-                      <span>Cash on Delivery (COD)</span>
+                      <div className="flex-1">
+                        <span className="font-medium">Cash on Delivery (COD)</span>
+                        <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
+                      </div>
                     </label>
-                    <label className="flex items-center gap-3 p-3 border border-muted rounded cursor-pointer">
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-secondary/10 transition-colors">
                       <input
                         type="radio"
                         name="payment"
                         value="card"
+                        checked={formData.paymentMethod === "card"}
                         onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                        className="w-4 h-4 text-primary"
+                        disabled={loading}
                       />
-                      <span>Credit/Debit Card</span>
+                      <div className="flex-1">
+                        <span className="font-medium">Credit/Debit Card</span>
+                        <p className="text-sm text-muted-foreground">Pay securely with your card</p>
+                      </div>
                     </label>
                   </div>
                 </div>
@@ -211,8 +325,17 @@ export default function CheckoutPage() {
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg"
                   disabled={loading}
                 >
-                  {loading ? "Processing..." : "Place Order"}
-                  {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Place Order
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
                 </Button>
               </form>
             </Card>
@@ -223,11 +346,12 @@ export default function CheckoutPage() {
             <h2 className="text-xl font-bold">Order Summary</h2>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {cart.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>
-                    {item.name} x{item.quantity}
-                  </span>
-                  <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                <div key={item._id} className="flex justify-between items-center text-sm">
+                  <div className="flex-1">
+                    <span className="font-medium">{item.name}</span>
+                    <p className="text-muted-foreground text-xs">{item.weight} × {item.quantity}</p>
+                  </div>
+                  <span className="font-medium">₹{(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -242,12 +366,17 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? "Free" : `₹${shipping}`}</span>
+                <span className={shipping === 0 ? "text-green-600 font-medium" : ""}>
+                  {shipping === 0 ? "Free" : `₹${shipping}`}
+                </span>
               </div>
             </div>
             <div className="border-t pt-4 flex justify-between text-lg font-bold">
               <span>Total</span>
               <span className="text-primary">₹{total.toFixed(2)}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              By placing your order, you agree to our Terms & Conditions
             </div>
           </Card>
         </div>

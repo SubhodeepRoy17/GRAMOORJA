@@ -6,45 +6,197 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
-import { Trash2, ShoppingBag, ArrowRight } from "lucide-react"
+import { Trash2, ShoppingBag, ArrowRight, Loader2 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+
+interface CartItem {
+  _id: string
+  name: string
+  price: number
+  weight: string
+  image: string
+  quantity: number
+}
 
 export default function CartPage() {
-  const [cart, setCart] = useState<any[]>([])
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      const parsedCart = JSON.parse(savedCart)
-      const grouped = parsedCart.reduce((acc: any, item: any) => {
-        const existing = acc.find((i: any) => i.id === item.id)
-        if (existing) {
-          existing.quantity += item.quantity
-        } else {
-          acc.push(item)
+    const checkAuthAndFetchCart = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch user info first to check auth
+        const userResponse = await fetch('/api/users/me', {
+          credentials: 'include'
+        })
+        
+        const userData = await userResponse.json()
+        
+        if (!userData.success) {
+          // Not authenticated, redirect to login
+          router.push("/auth/login?redirect=/cart")
+          return
         }
-        return acc
-      }, [])
-      setCart(grouped)
-    }
-  }, [])
 
-  const updateQuantity = (id: number, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(id)
-    } else {
-      const updated = cart.map((item) => (item.id === id ? { ...item, quantity } : item))
-      setCart(updated)
-      localStorage.setItem("cart", JSON.stringify(updated))
+        // If authenticated, fetch cart
+        await fetchCart()
+      } catch (error) {
+        console.error('Auth check error:', error)
+        router.push("/auth/login?redirect=/cart")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuthAndFetchCart()
+  }, [router])
+
+  const fetchCart = async () => {
+    try {
+      setLoading(true)
+      
+      const response = await fetch('/api/cart', {
+        credentials: 'include'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Transform cart items
+        const cartItems = data.data?.items?.map((item: any) => ({
+          _id: item.product._id,
+          name: item.product.name,
+          price: item.product.price,
+          weight: item.product.weight,
+          image: item.product.image,
+          quantity: item.quantity
+        })) || []
+        setCart(cartItems)
+      } else {
+        if (data.error === 'Unauthorized') {
+          router.push("/auth/login?redirect=/cart")
+        } else {
+          toast.error('Failed to load cart')
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error)
+      toast.error('Failed to load cart')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const removeFromCart = (id: number) => {
-    const updated = cart.filter((item) => item.id !== id)
-    setCart(updated)
-    localStorage.setItem("cart", JSON.stringify(updated))
+  const updateQuantity = async (id: string, quantity: number) => {
+    if (quantity < 0) return
+    
+    try {
+      setUpdating(id)
+      
+      if (quantity === 0) {
+        await removeFromCart(id)
+        return
+      }
+
+      const response = await fetch('/api/cart', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId: id, quantity }),
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setCart(prevCart => 
+          prevCart.map(item => 
+            item._id === id ? { ...item, quantity } : item
+          )
+        )
+        toast.success('Cart updated')
+      } else {
+        if (data.error === 'Unauthorized') {
+          router.push("/auth/login?redirect=/cart")
+        } else {
+          toast.error(data.error || 'Failed to update cart')
+          fetchCart()
+        }
+      }
+    } catch (error) {
+      console.error('Error updating cart:', error)
+      toast.error('Failed to update cart')
+      fetchCart()
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const removeFromCart = async (id: string) => {
+    try {
+      setUpdating(id)
+      
+      const response = await fetch(`/api/cart?productId=${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setCart(prevCart => prevCart.filter(item => item._id !== id))
+        toast.success('Item removed from cart')
+      } else {
+        if (data.error === 'Unauthorized') {
+          router.push("/auth/login?redirect=/cart")
+        } else {
+          toast.error(data.error || 'Failed to remove item')
+          fetchCart()
+        }
+      }
+    } catch (error) {
+      console.error('Error removing from cart:', error)
+      toast.error('Failed to remove item')
+      fetchCart()
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const clearCart = async () => {
+    try {
+      setUpdating('clear')
+      
+      const response = await fetch('/api/cart', {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setCart([])
+        toast.success('Cart cleared')
+      } else {
+        if (data.error === 'Unauthorized') {
+          router.push("/auth/login?redirect=/cart")
+        } else {
+          toast.error(data.error || 'Failed to clear cart')
+          fetchCart()
+        }
+      }
+    } catch (error) {
+      console.error('Error clearing cart:', error)
+      toast.error('Failed to clear cart')
+      fetchCart()
+    } finally {
+      setUpdating(null)
+    }
   }
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -53,12 +205,22 @@ export default function CartPage() {
   const total = subtotal + tax + shipping
 
   const handleCheckout = () => {
-    const user = localStorage.getItem("user")
-    if (!user) {
-      router.push("/auth/login")
-      return
-    }
     router.push("/checkout")
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-background py-12 px-4">
+          <div className="max-w-7xl mx-auto text-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground mt-4">Loading your cart...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
   }
 
   return (
@@ -66,7 +228,24 @@ export default function CartPage() {
       <Header />
       <main className="min-h-screen bg-background py-12 px-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold font-serif text-primary mb-8">Shopping Cart</h1>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold font-serif text-primary">Shopping Cart</h1>
+            {cart.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={clearCart}
+                disabled={updating === 'clear'}
+                className="text-red-600 hover:bg-red-50 border-red-200"
+              >
+                {updating === 'clear' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                Clear Cart
+              </Button>
+            )}
+          </div>
 
           {cart.length === 0 ? (
             <Card className="p-12 text-center space-y-4">
@@ -85,9 +264,14 @@ export default function CartPage() {
               {/* Cart Items */}
               <div className="lg:col-span-2 space-y-4">
                 {cart.map((item) => (
-                  <Card key={item.id} className="p-4 flex gap-4">
-                    <div className="w-24 h-24 relative rounded overflow-hidden">
-                      <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                  <Card key={item._id} className="p-4 flex gap-4 items-center">
+                    <div className="w-24 h-24 relative rounded overflow-hidden flex-shrink-0">
+                      <Image 
+                        src={item.image || "/laddoo.jpg"} 
+                        alt={item.name} 
+                        fill 
+                        className="object-cover" 
+                      />
                     </div>
                     <div className="flex-1 space-y-2">
                       <h3 className="font-semibold">{item.name}</h3>
@@ -96,21 +280,44 @@ export default function CartPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 bg-muted rounded">
-                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="px-3 py-1">
-                          -
+                        <button 
+                          onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                          disabled={updating === item._id}
+                          className="px-3 py-1 hover:bg-muted-foreground/10 disabled:opacity-50"
+                        >
+                          {updating === item._id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            "-"
+                          )}
                         </button>
-                        <span className="px-3 py-1 border-l border-r">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="px-3 py-1">
-                          +
+                        <span className="px-3 py-1 border-l border-r min-w-8 text-center">
+                          {item.quantity}
+                        </span>
+                        <button 
+                          onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                          disabled={updating === item._id}
+                          className="px-3 py-1 hover:bg-muted-foreground/10 disabled:opacity-50"
+                        >
+                          {updating === item._id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            "+"
+                          )}
                         </button>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => removeFromCart(item._id)}
+                        disabled={updating === item._id}
                         className="text-red-600 hover:bg-red-50"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {updating === item._id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   </Card>
@@ -143,10 +350,16 @@ export default function CartPage() {
                 <Button
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                   onClick={handleCheckout}
+                  size="lg"
                 >
                   Proceed to Checkout
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
+                <Link href="/shop">
+                  <Button variant="outline" className="w-full">
+                    Continue Shopping
+                  </Button>
+                </Link>
               </Card>
             </div>
           )}

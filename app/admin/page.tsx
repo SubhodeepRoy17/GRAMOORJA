@@ -7,47 +7,118 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
 import { Package, ShoppingCart, Users, TrendingUp } from "lucide-react"
+import { toast } from "sonner"
 
 export default function AdminPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, totalUsers: 0 })
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const adminPass = localStorage.getItem("adminPass")
-    if (!adminPass) {
-      const pass = prompt("Enter admin password:")
-      if (pass === "admin123") {
-        localStorage.setItem("adminPass", "true")
-      } else {
-        router.push("/")
+    const checkAdminAccess = async () => {
+      try {
+        setLoading(true)
+        
+        // First check if user is authenticated
+        const userResponse = await fetch('/api/users/me', {
+          credentials: 'include'
+        })
+        
+        const userData = await userResponse.json()
+        
+        if (!userData.success) {
+          // Not authenticated
+          router.push("/auth/login?redirect=/admin")
+          return
+        }
+
+        // Check if user is admin
+        if (userData.data.role !== 'admin') {
+          toast.error('Admin access required')
+          router.push("/")
+          return
+        }
+
+        // User is admin, fetch admin data
+        await fetchAdminData()
+      } catch (error) {
+        console.error('Admin access check error:', error)
+        router.push("/auth/login?redirect=/admin")
+      } finally {
+        setLoading(false)
       }
     }
 
-    const savedOrders = localStorage.getItem("orders")
-    if (savedOrders) {
-      const allOrders = JSON.parse(savedOrders)
-      setOrders(allOrders)
-      setStats((prev) => ({
-        ...prev,
-        totalOrders: allOrders.length,
-        totalRevenue: allOrders.reduce((sum: number, o: any) => sum + o.total, 0),
-      }))
-    }
-
-    const savedUsers = localStorage.getItem("users")
-    if (savedUsers) {
-      const allUsers = JSON.parse(savedUsers)
-      setUsers(allUsers)
-      setStats((prev) => ({ ...prev, totalUsers: allUsers.length }))
-    }
+    checkAdminAccess()
   }, [router])
 
-  const updateOrderStatus = (orderId: string, newStatus: string) => {
-    const updated = orders.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order))
-    setOrders(updated)
-    localStorage.setItem("orders", JSON.stringify(updated))
+  const fetchAdminData = async () => {
+    try {
+      const response = await fetch('/api/admin', {
+        credentials: 'include'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setOrders(data.data.orders || [])
+        setUsers(data.data.users || [])
+        setStats({
+          totalOrders: data.data.stats?.totalOrders || 0,
+          totalRevenue: data.data.stats?.totalRevenue || 0,
+          totalUsers: data.data.stats?.totalUsers || 0,
+        })
+      } else {
+        toast.error(data.error || 'Failed to load admin data')
+      }
+    } catch (error) {
+      console.error('Error fetching admin data:', error)
+      toast.error('Failed to load admin data')
+    }
+  }
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setOrders(prev => 
+          prev.map(order => 
+            order._id === orderId ? { ...order, status: newStatus } : order
+          )
+        )
+        toast.success('Order status updated')
+      } else {
+        toast.error(data.error || 'Failed to update order status')
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error)
+      toast.error('Failed to update order status')
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-background py-12 px-4">
+          <div className="max-w-7xl mx-auto text-center py-16">
+            <div className="w-8 h-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+            <p className="text-muted-foreground mt-4">Loading admin dashboard...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
   }
 
   return (
@@ -109,14 +180,14 @@ export default function AdminPage() {
                   </thead>
                   <tbody>
                     {orders.map((order) => (
-                      <tr key={order.id} className="border-t">
-                        <td className="px-6 py-4 text-sm font-mono">{order.id}</td>
-                        <td className="px-6 py-4 text-sm">{order.fullName}</td>
-                        <td className="px-6 py-4 text-sm font-bold">₹{order.total.toFixed(2)}</td>
+                      <tr key={order._id} className="border-t">
+                        <td className="px-6 py-4 text-sm font-mono">{order.orderId}</td>
+                        <td className="px-6 py-4 text-sm">{order.customerName || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm font-bold">₹{order.total?.toFixed(2) || '0.00'}</td>
                         <td className="px-6 py-4">
                           <select
-                            value={order.status}
-                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                            value={order.status || 'pending'}
+                            onChange={(e) => updateOrderStatus(order._id, e.target.value)}
                             className={`px-3 py-1 rounded text-sm font-medium border-0 ${
                               order.status === "pending"
                                 ? "bg-yellow-100 text-yellow-800"
@@ -126,12 +197,19 @@ export default function AdminPage() {
                             }`}
                           >
                             <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="processing">Processing</option>
                             <option value="shipped">Shipped</option>
                             <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
                           </select>
                         </td>
                         <td className="px-6 py-4">
-                          <Button size="sm" variant="outline">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => router.push(`/admin/orders/${order._id}`)}
+                          >
                             Details
                           </Button>
                         </td>

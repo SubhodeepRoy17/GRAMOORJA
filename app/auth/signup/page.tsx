@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -11,6 +10,7 @@ import { Card } from "@/components/ui/card"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight } from "lucide-react"
+import { toast } from "sonner"
 
 export default function SignupPage() {
   const [name, setName] = useState("")
@@ -29,34 +29,55 @@ export default function SignupPage() {
 
     if (password !== confirmPassword) {
       setError("Passwords don't match")
+      toast.error("Passwords don't match")
       return
     }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters")
+      toast.error("Password must be at least 6 characters")
       return
     }
 
     setLoading(true)
 
     try {
-      const users = JSON.parse(localStorage.getItem("users") || "[]")
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name, email, phone, address, password }),
+      })
 
-      if (users.some((u: any) => u.email === email)) {
-        setError("Email already registered")
+      const data = await response.json()
+
+      if (!data.success) {
+        setError(data.error || 'Signup failed')
+        toast.error(data.error || 'Signup failed')
         setLoading(false)
         return
       }
 
-      const newUser = { name, email, phone, address, password }
-      users.push(newUser)
-      localStorage.setItem("users", JSON.stringify(users))
-
-      localStorage.setItem("user", JSON.stringify({ email, name }))
-      localStorage.setItem("token", "auth-token-" + Date.now())
-      router.push("/")
+      // Show success toast
+      toast.success('Account created successfully! Please login.')
+      
+      // Clear form
+      setName("")
+      setEmail("")
+      setPhone("")
+      setAddress("")
+      setPassword("")
+      setConfirmPassword("")
+      
+      // Redirect to login page after 1.5 seconds
+      setTimeout(() => {
+        router.push('/auth/login')
+      }, 1500)
+      
     } catch (err) {
-      setError("Signup failed. Please try again.")
+      console.error('Signup error:', err)
+      setError('Signup failed. Please try again.')
+      toast.error('Signup failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -76,7 +97,13 @@ export default function SignupPage() {
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Full Name</label>
-                <Input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} required />
+                <Input 
+                  placeholder="Your name" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  required 
+                  disabled={loading}
+                />
               </div>
 
               <div>
@@ -87,6 +114,7 @@ export default function SignupPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -97,6 +125,7 @@ export default function SignupPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -107,6 +136,7 @@ export default function SignupPage() {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -118,6 +148,7 @@ export default function SignupPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -129,6 +160,7 @@ export default function SignupPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
 

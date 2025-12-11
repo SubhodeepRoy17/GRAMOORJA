@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ShoppingCart, Star, Search, Filter, Plus, Minus } from "lucide-react"
+import { ShoppingCart, Star, Search, Filter, Plus, Minus, Loader2 } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
 
 interface Product {
-  id: number
+  _id: string
   name: string
   price: number
   weight: string
@@ -21,170 +21,179 @@ interface Product {
   description: string
   image: string
   category?: string
+  stock: number
 }
 
-interface CartItem extends Product {
+interface CartItem {
+  _id: string
+  name: string
+  price: number
+  weight: string
+  rating: number
+  reviews: number
+  description: string
+  image: string
+  category?: string
   quantity: number
 }
-
-const products: Product[] = [
-  {
-    id: 1,
-    name: "Premium Kanakchur Muri Ladoo",
-    price: 299,
-    weight: "500g",
-    rating: 4.8,
-    reviews: 156,
-    description: "Traditional handcrafted sweets",
-    image: "/laddoo.jpg",
-    category: "ladoo"
-  },
-  {
-    id: 2,
-    name: "Deluxe Gift Box",
-    price: 599,
-    weight: "1kg",
-    rating: 4.9,
-    reviews: 89,
-    description: "Perfect for celebrations",
-    image: "/laddoo.jpg",
-    category: "gift"
-  },
-  {
-    id: 3,
-    name: "Family Pack",
-    price: 999,
-    weight: "2kg",
-    rating: 4.7,
-    reviews: 234,
-    description: "Best value for families",
-    image: "/laddoo.jpg",
-    category: "pack"
-  },
-  {
-    id: 4,
-    name: "Assorted Sweets",
-    price: 449,
-    weight: "750g",
-    rating: 4.6,
-    reviews: 112,
-    description: "Mix of our finest varieties",
-    image: "/laddoo.jpg",
-    category: "assorted"
-  },
-  {
-    id: 5,
-    name: "Special Mithai Collection",
-    price: 749,
-    weight: "1.5kg",
-    rating: 4.9,
-    reviews: 178,
-    description: "Exclusive festive collection",
-    image: "/laddoo.jpg",
-    category: "premium"
-  },
-  {
-    id: 6,
-    name: "Mini Ladoo Box",
-    price: 199,
-    weight: "250g",
-    rating: 4.5,
-    reviews: 98,
-    description: "Perfect for small celebrations",
-    image: "/laddoo.jpg",
-    category: "ladoo"
-  },
-  {
-    id: 7,
-    name: "Corporate Gift Pack",
-    price: 1299,
-    weight: "3kg",
-    rating: 4.8,
-    reviews: 56,
-    description: "Premium packaging for corporate gifting",
-    image: "/laddoo.jpg",
-    category: "gift"
-  },
-  {
-    id: 8,
-    name: "Sugar-Free Sweets",
-    price: 399,
-    weight: "500g",
-    rating: 4.7,
-    reviews: 203,
-    description: "Healthy alternative without compromising taste",
-    image: "/laddoo.jpg",
-    category: "sugarfree"
-  },
-]
 
 const categories = ["All", "ladoo", "gift", "pack", "assorted", "premium", "sugarfree"]
 
 export default function ShopPage() {
+  const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [sortBy, setSortBy] = useState("default")
+  const [loading, setLoading] = useState(true)
+  const [cartLoading, setCartLoading] = useState(false)
 
-  // Initialize cart from localStorage on mount
+  // Fetch products from API
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart))
-      } catch (error) {
-        console.error("Failed to parse cart from localStorage:", error)
-      }
-    }
+    fetchProducts()
+    fetchCart()
   }, [])
 
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart))
-  }, [cart])
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/products')
+      const data = await response.json()
+      
+      if (data.success) {
+        setProducts(data.data)
+      } else {
+        toast.error('Failed to load products')
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      toast.error('Failed to load products')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const getProductQuantity = (productId: number) => {
-    const cartItem = cart.find(item => item.id === productId)
+  const fetchCart = async () => {
+    try {
+      const response = await fetch('/api/cart')
+      const data = await response.json()
+      
+      if (data.success) {
+        // Transform cart items to match our interface
+        const cartItems = data.data?.items?.map((item: any) => ({
+          ...item.product,
+          quantity: item.quantity
+        })) || []
+        setCart(cartItems)
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error)
+    }
+  }
+
+  const getProductQuantity = (productId: string) => {
+    const cartItem = cart.find(item => item._id === productId)
     return cartItem ? cartItem.quantity : 0
   }
 
-  const addToCart = (product: Product) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product.id)
-      let newCart
+  const addToCart = async (product: Product) => {
+    try {
+      setCartLoading(true)
       
-      if (existingItem) {
-        newCart = prevCart.map(item => 
-          item.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
+      const response = await fetch('/api/cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: product._id,
+          quantity: 1
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        // Update local cart state
+        const existingItem = cart.find(item => item._id === product._id)
+        let newCart
+        
+        if (existingItem) {
+          newCart = cart.map(item => 
+            item._id === product._id 
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          )
+        } else {
+          newCart = [...cart, { ...product, quantity: 1 }]
+        }
+        
+        setCart(newCart)
+        toast.success(`${product.name} added to cart`)
       } else {
-        newCart = [...prevCart, { ...product, quantity: 1 }]
+        toast.error(data.error || 'Failed to add to cart')
       }
-      
-      toast.success(`${product.name} added to cart`)
-      return newCart
-    })
+    } catch (error) {
+      console.error('Error adding to cart:', error)
+      toast.error('Failed to add to cart')
+    } finally {
+      setCartLoading(false)
+    }
   }
 
-  const removeFromCart = (productId: number) => {
-    setCart(prevCart => {
-      const newCart = prevCart
-        .map(item => 
-          item.id === productId 
-            ? { ...item, quantity: Math.max(0, item.quantity - 1) }
-            : item
-        )
-        .filter(item => item.quantity > 0)
+  const removeFromCart = async (productId: string) => {
+    try {
+      setCartLoading(true)
       
-      const product = products.find(p => p.id === productId)
-      if (product) {
-        toast.info(`${product.name} removed from cart`)
+      const currentQuantity = getProductQuantity(productId)
+      
+      if (currentQuantity <= 1) {
+        // Remove item completely
+        const response = await fetch(`/api/cart?productId=${productId}`, {
+          method: 'DELETE',
+        })
+
+        const data = await response.json()
+        
+        if (data.success) {
+          const newCart = cart.filter(item => item._id !== productId)
+          setCart(newCart)
+          const product = products.find(p => p._id === productId)
+          if (product) {
+            toast.info(`${product.name} removed from cart`)
+          }
+        }
+      } else {
+        // Decrease quantity
+        const response = await fetch('/api/cart', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: productId,
+            quantity: currentQuantity - 1
+          }),
+        })
+
+        const data = await response.json()
+        
+        if (data.success) {
+          const newCart = cart.map(item => 
+            item._id === productId 
+              ? { ...item, quantity: item.quantity - 1 }
+              : item
+          ).filter(item => item.quantity > 0)
+          
+          setCart(newCart)
+          const product = products.find(p => p._id === productId)
+          if (product) {
+            toast.info(`Reduced ${product.name} quantity`)
+          }
+        }
       }
-      
-      return newCart
-    })
+    } catch (error) {
+      console.error('Error removing from cart:', error)
+      toast.error('Failed to update cart')
+    } finally {
+      setCartLoading(false)
+    }
   }
 
   const filteredProducts = products.filter((product) => {
@@ -287,7 +296,12 @@ export default function ShopPage() {
             </div>
 
             {/* Products Grid */}
-            {sortedProducts.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                <p className="text-muted-foreground mt-4">Loading products...</p>
+              </div>
+            ) : sortedProducts.length === 0 ? (
               <div className="text-center py-16">
                 <h3 className="text-lg font-semibold text-muted-foreground mb-2">
                   No products found
@@ -299,17 +313,18 @@ export default function ShopPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {sortedProducts.map((product) => {
-                  const quantity = getProductQuantity(product.id)
+                  const quantity = getProductQuantity(product._id)
+                  const outOfStock = product.stock <= 0
                   
                   return (
                     <Card 
-                      key={product.id} 
+                      key={product._id} 
                       className="overflow-hidden group hover:shadow-xl transition-all duration-300 border-primary/10"
                     >
                       {/* Product Image */}
                       <div className="aspect-square relative bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden">
                         <Image
-                          src={product.image || "/placeholder.svg"}
+                          src={product.image || "/laddoo.jpg"}
                           alt={product.name}
                           fill
                           className="object-cover group-hover:scale-110 transition-transform duration-500"
@@ -326,6 +341,14 @@ export default function ShopPage() {
                           <Star className="w-3 h-3 fill-primary text-primary" />
                           <span className="text-xs font-bold">{product.rating}</span>
                         </div>
+                        {/* Out of Stock Overlay */}
+                        {outOfStock && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <span className="bg-red-600 text-white px-3 py-1 rounded-full font-bold">
+                              Out of Stock
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Product Info */}
@@ -343,7 +366,7 @@ export default function ShopPage() {
                             <p className="text-lg font-bold text-primary">₹{product.price}</p>
                             <div className="flex items-center gap-1">
                               <span className="text-xs text-muted-foreground">
-                                ({product.reviews} reviews)
+                                ({product.reviews} reviews) • {product.stock} in stock
                               </span>
                             </div>
                           </div>
@@ -355,9 +378,10 @@ export default function ShopPage() {
                                 size="icon"
                                 variant="outline"
                                 className="h-8 w-8"
-                                onClick={() => removeFromCart(product.id)}
+                                onClick={() => removeFromCart(product._id)}
+                                disabled={cartLoading || outOfStock}
                               >
-                                <Minus className="w-4 h-4" />
+                                {cartLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Minus className="w-4 h-4" />}
                               </Button>
                               <span className="font-bold text-lg min-w-8 text-center">{quantity}</span>
                               <Button
@@ -365,8 +389,9 @@ export default function ShopPage() {
                                 variant="default"
                                 className="h-8 w-8 bg-primary hover:bg-primary/90"
                                 onClick={() => addToCart(product)}
+                                disabled={cartLoading || outOfStock}
                               >
-                                <Plus className="w-4 h-4" />
+                                {cartLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-4 h-4" />}
                               </Button>
                             </div>
                           ) : (
@@ -374,9 +399,10 @@ export default function ShopPage() {
                               size="sm"
                               className="bg-primary hover:bg-primary/90 gap-2"
                               onClick={() => addToCart(product)}
+                              disabled={cartLoading || outOfStock}
                             >
-                              <ShoppingCart className="w-4 h-4" />
-                              Add to Cart
+                              {cartLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
+                              {outOfStock ? "Out of Stock" : "Add to Cart"}
                             </Button>
                           )}
                         </div>
